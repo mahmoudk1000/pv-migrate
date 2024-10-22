@@ -58,6 +58,20 @@ spec:
                 echo "rsync job failed after $retries retries"
               fi
               exit $rc
+          env:
+            # Add fixed environment variables here
+            - name: HTTP_PROXY
+              value: "http://www-proxy.nl.ao-srv.com:8080"
+            - name: HTTPS_PROXY
+              value: "http://www-proxy.nl.ao-srv.com:8080"
+            - name: NO_PROXY
+              value: "NO_PROXY=127.0.0.1,161.89.22.251,localhost,DEFTHWA9C99SRV,DENBGAT9L9NSRV,DEFTHWA9A8USRV,DENBGAT9YP1SRV,DENBGAT95LXSRV,DEFTHWA91JLSRV,DENBGAT9MC8SRV,155.45.182.232,155.45.182.233,161.89.22.250,10.96.0.0/12,10.244.0.0/16,10.0.0.0/8,155.45.0.0/16,155.45.128.0/16,161.89.0.0/16,.saacon.net,.cluster.local,.svc"
+            - name: http_proxy
+              value: "http://www-proxy.nl.ao-srv.com:8080"
+            - name: https_proxy
+              value: "http://www-proxy.nl.ao-srv.com:8080"
+            - name: no_proxy
+              value: "no_proxy=127.0.0.1,161.89.22.251,localhost,DEFTHWA9C99SRV,DENBGAT9L9NSRV,DEFTHWA9A8USRV,DENBGAT9YP1SRV,DENBGAT95LXSRV,DEFTHWA91JLSRV,DENBGAT9MC8SRV,155.45.182.232,155.45.182.233,161.89.22.250,10.96.0.0/12,10.244.0.0/16,10.0.0.0/8,155.45.0.0/16,155.45.128.0/16,161.89.0.0/16,.saacon.net,.cluster.local,.svc"
           securityContext:
             {{- toYaml .Values.rsync.securityContext | nindent 12 }}
           image: "{{ .Values.rsync.image.repository }}:{{ .Values.rsync.image.tag }}"
@@ -88,6 +102,10 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      hostAliases:
+        {{- if .Values.rsync.hostAliases }}
+        {{- toYaml .Values.rsync.hostAliases | nindent 8 }}
+        {{- end }}
       volumes:
         {{- range $index, $mount := .Values.rsync.pvcMounts }}
         - name: vol-{{ $index }}
