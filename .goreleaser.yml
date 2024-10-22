@@ -1,25 +1,14 @@
 ---
 before:
-  hooks:
-    - go mod download
-    - ./scripts/completions.sh
-
+  hooks: [go mod download, ./scripts/completions.sh]
 builds:
   - id: pv-migrate
     main: ./cmd/pv-migrate
     binary: pv-migrate
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-      - darwin
-      - windows
-    goarch:
-      - amd64
-      - arm
-      - arm64
-    goarm:
-     - "7"
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm, arm64]
+    goarm: ['7']
     ignore:
       - goos: windows
         goarch: arm
@@ -27,7 +16,6 @@ builds:
         goarch: arm64
       - goos: darwin
         goarch: arm
-
 archives:
   - id: pv-migrate-archive
     # default name template except we use .Tag instead of .Version to keep the "v" prefix
@@ -41,19 +29,14 @@ archives:
       {{- with .Arm }}v{{ . }}{{ end }}
       {{- with .Mips }}_{{ . }}{{ end }}
       {{- if not (eq .Amd64 "v1") }}{{ .Amd64 }}{{ end }}
-    builds:
-      - pv-migrate
+    builds: [pv-migrate]
     format_overrides:
       - goos: windows
         format: zip
-    files:
-      - LICENSE
-      - completions/*
-
+    files: [LICENSE, completions/*]
 checksum:
   name_template: checksums.txt
   algorithm: sha256
-
 changelog:
   sort: asc
   filters:
@@ -69,52 +52,42 @@ changelog:
       - Merge pull request
       - Merge branch
       - go mod tidy
-
 dockers:
-  - image_templates:
-      - docker.io/utkuozdemir/pv-migrate:{{ .Tag }}-amd64
+  - image_templates: ['docker.io/mahmoudk1000/pv-migrate:{{ .Tag }}-amd64']
     use: buildx
     dockerfile: Dockerfile
-    build_flag_templates:
-      - --platform=linux/amd64
-  - image_templates:
-      - docker.io/utkuozdemir/pv-migrate:{{ .Tag }}-arm64
+    build_flag_templates: [--platform=linux/amd64]
+  - image_templates: ['docker.io/mahmoudk1000/pv-migrate:{{ .Tag }}-arm64']
     use: buildx
     goarch: arm64
     dockerfile: Dockerfile
-    build_flag_templates:
-      - --platform=linux/arm64
-  - image_templates:
-      - docker.io/utkuozdemir/pv-migrate:{{ .Tag }}-armv7
+    build_flag_templates: [--platform=linux/arm64]
+  - image_templates: ['docker.io/mahmoudk1000/pv-migrate:{{ .Tag }}-armv7']
     use: buildx
     goarch: arm
-    goarm: "7"
+    goarm: '7'
     dockerfile: Dockerfile
-    build_flag_templates:
-      - --platform=linux/arm/v7
-
+    build_flag_templates: [--platform=linux/arm/v7]
 docker_manifests:
-  - name_template: docker.io/utkuozdemir/pv-migrate:{{ .Tag }}
+  - name_template: docker.io/mahmoudk1000/pv-migrate:{{ .Tag }}
     image_templates:
-      - docker.io/utkuozdemir/pv-migrate:{{ .Tag }}-amd64
-      - docker.io/utkuozdemir/pv-migrate:{{ .Tag }}-arm64
-      - docker.io/utkuozdemir/pv-migrate:{{ .Tag }}-armv7
-
+      - docker.io/mahmoudk1000/pv-migrate:{{ .Tag }}-amd64
+      - docker.io/mahmoudk1000/pv-migrate:{{ .Tag }}-arm64
+      - docker.io/mahmoudk1000/pv-migrate:{{ .Tag }}-armv7
 # To test docker image push, uncomment the following and run
 # goreleaser release --skip-validate --rm-dist --debug
-#release:
+# release:
 #  disable: true
-
 brews:
   - repository:
       owner: utkuozdemir
       name: homebrew-pv-migrate
-      token: "{{ .Env.PRIVATE_ACCESS_TOKEN }}"
+      token: '{{ .Env.PRIVATE_ACCESS_TOKEN }}'
     commit_author:
       name: Utku Ozdemir
       email: uoz@protonmail.com
     directory: Formula
-    goarm: "7"
+    goarm: '7'
     homepage: https://github.com/utkuozdemir/pv-migrate
     description: Persistent volume migration plugin for Kubernetes
     license: Apache-2.0
@@ -125,16 +98,15 @@ brews:
       bash_completion.install "completions/pv-migrate.bash" => "pv-migrate"
       zsh_completion.install "completions/pv-migrate.zsh" => "_pv-migrate"
       fish_completion.install "completions/pv-migrate.fish"
-
 scoops:
   - repository:
       owner: utkuozdemir
       name: scoop-pv-migrate
-      token: "{{ .Env.PRIVATE_ACCESS_TOKEN }}"
+      token: '{{ .Env.PRIVATE_ACCESS_TOKEN }}'
     commit_author:
       name: Utku Ozdemir
       email: uoz@protonmail.com
-    commit_msg_template: "Scoop update for {{ .ProjectName }} version {{ .Tag }}"
+    commit_msg_template: Scoop update for {{ .ProjectName }} version {{ .Tag }}
     homepage: https://github.com/utkuozdemir/pv-migrate
     description: Persistent volume migration plugin for Kubernetes
     license: Apache-2.0
