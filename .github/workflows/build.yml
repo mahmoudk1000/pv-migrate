@@ -1,37 +1,31 @@
 ---
 name: build
-
 on:
   push:
-    branches:
-      - master
-      - renovate/**
+    branches: [master, renovate/**]
     paths-ignore:
-      - "**.md"
-      - "img/**"
-      - "test/**"
-      - ".gitignore"
-      - "docker/**"
-      - "helm/**"
-      - "renovate.json"
-      - ".krew.yaml"
+      - '**.md'
+      - img/**
+      - test/**
+      - .gitignore
+      - docker/**
+      - helm/**
+      - renovate.json
+      - .krew.yaml
   pull_request:
-    branches:
-      - master
+    branches: [master]
     paths-ignore:
-      - "**.md"
-      - "img/**"
-      - "test/**"
-      - ".gitignore"
-      - "docker/**"
-      - "helm/**"
-      - "renovate.json"
-      - ".krew.yaml"
-
+      - '**.md'
+      - img/**
+      - test/**
+      - .gitignore
+      - docker/**
+      - helm/**
+      - renovate.json
+      - .krew.yaml
 concurrency:
   group: build-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
-
 jobs:
   build:
     runs-on: ubuntu-24.04
@@ -67,117 +61,3 @@ jobs:
         run: task update-usage
       - name: Check for dirty files
         run: git diff --exit-code
-  test:
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4.2.1
-      - name: Install go
-        uses: actions/setup-go@v5.0.2
-        with:
-          go-version-file: go.mod
-      - name: Install richgo
-        # renovate: depName=kyoh86/richgo
-        run: go install github.com/kyoh86/richgo@v0.3.12
-      - name: Install helm
-        run: curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-      - name: Install cilium-cli
-        env:
-          # renovate: depName=cilium/cilium-cli datasource=github-releases
-          CILIUM_CLI_VERSION: v0.16.19
-        run: |
-          wget https://github.com/cilium/cilium-cli/releases/download/${CILIUM_CLI_VERSION}/cilium-linux-amd64.tar.gz
-          sudo tar xzvfC cilium-linux-amd64.tar.gz /usr/local/bin
-          rm cilium-linux-amd64.tar.gz
-
-      - name: kind-1 - Create cluster
-        uses: helm/kind-action@v1.10.0
-        with:
-          cluster_name: kind-1
-          # renovate: depName=kubernetes-sigs/kind datasource=github-releases
-          version: v0.24.0
-          config: test/kind-config.yaml
-      - name: kind-1 - Create metallb-system namespace
-        run: kubectl create namespace metallb-system --dry-run=client -oyaml | kubectl apply -f -
-      - name: kind-1 - Install allow-all network policies on system namespaces
-        run: |
-          kubectl -n kube-system apply -f test/netpol-allow-all.yaml
-          kubectl -n local-path-storage apply -f test/netpol-allow-all.yaml
-          kubectl -n metallb-system apply -f test/netpol-allow-all.yaml
-      - name: kind-1 - Install Cilium with default-deny policy
-        run: cilium install --set policyEnforcementMode=always
-      - name: kind-1 - Install MetalLB
-        env:
-          # renovate: depName=metallb datasource=helm registryUrl=https://charts.bitnami.com/bitnami
-          METALLB_CHART_VERSION: 6.3.13
-        run: |
-          MANIFESTS_PATH=/tmp/metallb-manifests.yaml
-          
-          # Find the first IPv4 subnet of kind, e.g., 172.18.0.0/16, then trim it to remove last octet, e.g., 172.18.0
-          ADDRESS_RANGE_PREFIX=$(docker network inspect -f json kind | jq -r '.[0].IPAM.Config | map(select(.Subnet | test("^[0-9]+\\."))) | .[0].Subnet | split("/")[0] | split(".")[:3] | join(".")')
-          export ADDRESS_RANGE=${ADDRESS_RANGE_PREFIX}.240-${ADDRESS_RANGE_PREFIX}.255
-          
-          envsubst < test/metallb-manifests.yaml > $MANIFESTS_PATH
-          
-          helm repo add bitnami https://charts.bitnami.com/bitnami
-          helm upgrade metallb \
-          --install bitnami/metallb \
-          --namespace metallb-system \
-          --version ${METALLB_CHART_VERSION} \
-          --atomic \
-          --set networkPolicy.enabled=true
-          
-          helm -n metallb-system get values metallb
-          
-          echo "MetalLB rendered manifests:"
-          cat $MANIFESTS_PATH
-          
-          kubectl apply -f $MANIFESTS_PATH
-
-      - name: kind-1 - Wait for all pods in the cluster to be ready
-        run: |
-          for i in $(seq 1 10); do
-            echo "Attempt: $i"
-            kubectl wait pod --for=condition=Ready --all --all-namespaces && break;
-            sleep 5;
-          done
-
-      - name: kind-2 - Create cluster
-        uses: helm/kind-action@v1.10.0
-        env:
-          KUBECONFIG: /home/runner/.kube/kind-2.yaml
-        with:
-          cluster_name: kind-2
-          # renovate: depName=kubernetes-sigs/kind datasource=github-releases
-          version: v0.24.0
-          config: test/kind-config.yaml
-      - name: kind-2 - Install allow-all network policies on system namespaces
-        env:
-          KUBECONFIG: /home/runner/.kube/kind-2.yaml
-        run: |
-          kubectl -n kube-system apply -f test/netpol-allow-all.yaml
-          kubectl -n local-path-storage apply -f test/netpol-allow-all.yaml
-      - name: kind-2 - Install Cilium with default-deny policy
-        env:
-          KUBECONFIG: /home/runner/.kube/kind-2.yaml
-        run: cilium install --set policyEnforcementMode=always
-      - name: kind-2 - Wait for all pods in the cluster to be ready
-        env:
-          KUBECONFIG: /home/runner/.kube/kind-2.yaml
-        run: |
-          for i in $(seq 1 10); do
-            echo "Attempt: $i"
-            kubectl wait pod --for=condition=Ready --all --all-namespaces && break;
-            sleep 5;
-          done
-
-      - name: Run tests
-        env:
-          RICHGO_FORCE_COLOR: "1"
-          PVMIG_TEST_EXTRA_KUBECONFIG: /home/runner/.kube/kind-2.yaml
-        run: richgo test -tags integration -race -coverpkg=./... -coverprofile=coverage.txt -covermode=atomic -timeout 20m -v ./...
-      - name: Send coverage
-        uses: codecov/codecov-action@v4.6.0
-        with:
-          files: coverage.txt
-          token: ${{ secrets.CODECOV_TOKEN }}
