@@ -1,3 +1,4 @@
+---
 # -- String to partially override the fullname template with a string (will prepend the release name)
 nameOverride: ""
 # -- String to fully override the fullname template with a string
@@ -136,6 +137,12 @@ rsync:
   restartPolicy: Never
   # Rsync job backoff limit
   backoffLimit: 0
+  # Example:
+  # - ip: "127.0.0.1"
+  #   hostnames:
+  #     - "example.local"
+  #     - "another.local"
+  hostAliases: []
   networkPolicy:
     # -- Enable Rsync network policy
     enabled: false
